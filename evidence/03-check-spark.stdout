@@ -1,0 +1,2 @@
+SPARK_READY namespace=spark-demo deployment=spark
+Pi is roughly 3.142051142051142
