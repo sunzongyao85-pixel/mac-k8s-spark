@@ -1,0 +1,4 @@
+.tools/
+.DS_Store
+*.log
+evidence/ui-runs/
