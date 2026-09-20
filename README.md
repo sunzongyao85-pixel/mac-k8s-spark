@@ -119,7 +119,7 @@ ACCEPTANCE_PORT=8766 ./start-console.command
 
 若启动器提示缺少 Ruby，请使用已安装的 Ruby 运行环境；若提示缺少 WEBrick，可在该 Ruby 环境执行 `gem install --user-install webrick`。三个 Shell 入口本身不依赖 Ruby。
 
-## 建议面试官执行的验收步骤
+## 建议执行的验收步骤
 
 先依次运行三个脚本，确认均退出 0，再在同一终端定义便捷函数：
 
