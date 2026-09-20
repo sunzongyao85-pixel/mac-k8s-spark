@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spark-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark
+  namespace: spark-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: spark}
+  template:
+    metadata:
+      labels: {app: spark}
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: spark
+          image: spark:3.5.9-scala2.12-java17-python3-ubuntu
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef: {fieldPath: status.podIP}
+            - {name: SPARK_NO_DAEMONIZE, value: '1'}
+          command: [/bin/bash, -c]
+          args:
+            - |
+              set -euo pipefail
+              /opt/spark/sbin/start-master.sh --host "$POD_IP" --port 7077 --webui-port 8080 &
+              master=$!
+              /opt/spark/sbin/start-worker.sh --cores 1 --memory 1g --webui-port 8081 "spark://$POD_IP:7077" &
+              worker=$!
+              trap 'kill "$master" "$worker" 2>/dev/null || true; wait || true' EXIT
+              trap 'exit 0' TERM INT
+              wait -n "$master" "$worker"
+              exit 1
+          ports:
+            - {name: master-ui, containerPort: 8080}
+          resources:
+            requests: {cpu: 250m, memory: 1Gi}
+            limits: {cpu: '2', memory: 2560Mi}
+          startupProbe:
+            httpGet: {path: /json/, port: master-ui}
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command:
+                - python3
+                - -c
+                - "import json,urllib.request,os; s=json.load(urllib.request.urlopen('http://'+os.environ['POD_IP']+':8080/json/',timeout=2)); assert s['status']=='ALIVE' and any(w['state']=='ALIVE' for w in s['workers'])"
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /json/, port: master-ui}
+            periodSeconds: 10
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark
+  namespace: spark-demo
+spec:
+  selector: {app: spark}
+  ports:
+    - {name: master-ui, port: 8080, targetPort: master-ui}
